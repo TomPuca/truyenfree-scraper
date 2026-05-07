@@ -1,0 +1,29 @@
+# Môi trường ảo Python
+venv/
+env/
+.venv/
+
+# Output files (dữ liệu cá nhân, không cần commit)
+truyen_output.txt
+truyen_output.epub
+output.epub
+debug_encoding.py
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
