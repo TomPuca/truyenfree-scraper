@@ -130,6 +130,16 @@ def make_epub(input_file, output_file, book_title, author):
     book.set_language(DEFAULT_LANG)
     book.add_author(author)
 
+    # Cover image
+    cover_file = "Bia.webp"
+    if os.path.exists(cover_file):
+        with open(cover_file, "rb") as f:
+            cover_data = f.read()
+        book.set_cover("cover.webp", cover_data)
+        print(f"Đã thêm ảnh bìa: {cover_file}")
+    else:
+        print(f"Không tìm thấy ảnh bìa ({cover_file}), bỏ qua.")
+
     # CSS
     style = epub.EpubItem(
         uid="style",

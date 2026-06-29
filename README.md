@@ -1,168 +1,194 @@
 # Truyenfree Scraper
 
-Công cụ lấy dữ liệu text truyện từ [truyenfree.org](https://truyenfree.org), hỗ trợ vượt qua cơ chế chống lấy dữ liệu (CSS scrambling) và sử dụng proxy HTTP.
+Công cụ cào dữ liệu truyện từ các trang web [truyenfree.org](https://truyenfree.org), [tangthuvien.org](https://tangthuvien.org), [vietnamthuquan.eu](http://vietnamthuquan.eu), [webnovel.com](https://www.webnovel.com), [ntruyen.xyz](https://ntruyen.xyz) và [truyenhoangdung.xyz](https://www.truyenhoangdung.xyz), hỗ trợ vượt qua các cơ chế chống cào dữ liệu và tự động xuất ra định dạng sách điện tử **EPUB** chuyên nghiệp.
 
 ---
 
 ## Mục tiêu
 
-- Lấy nội dung từng chapter của truyện trên truyenfree.org
-- Vượt qua cơ chế bảo vệ nội dung (ký tự bị xáo trộn bằng CSS)
-- Toàn bộ request đi qua proxy HTTP
-- Kết quả lưu ra file text có cấu trúc theo yêu cầu
+- Lấy nội dung từng chương của truyện trên các website được hỗ trợ.
+- Tự động vượt qua các cơ chế bảo vệ nội dung tương ứng của từng trang.
+- Hỗ trợ đi qua Proxy cho các trang yêu cầu (như truyenfree).
+- Đóng gói kết quả thành file văn bản `.txt` và xuất thành tệp sách `.epub` hoàn thiện.
 
 ---
 
-## Cơ chế chống scraping và cách xử lý
+## Các Nguồn Hỗ Trợ & Cơ Chế Xử Lý
 
-### Website dùng kỹ thuật gì?
+### 1. `truyenfree` — truyenfree.org (Bảo vệ cao)
+- **Kỹ thuật bảo vệ**: Chia từng câu/đoạn văn thành hàng trăm thẻ `<span>` nhỏ sắp xếp ngẫu nhiên trong DOM, dùng CSS (`position`, `order`, `transform`...) để hiển thị đúng thứ tự trực quan. Ngoài ra chèn các đoạn text ẩn (trap text) với `display: none` hoặc `opacity: 0`.
+- **Giải pháp**: Sử dụng **Playwright** (trình duyệt headless) để kết xuất trang, thu thập tất cả text node trong `<article>`, lọc bỏ phần tử ẩn, lấy **tọa độ hiển thị thực tế** (`getBoundingClientRect`) và sắp xếp lại theo thứ tự hiển thị.
+- **Yêu cầu**: Cần cấu hình Proxy. Tốc độ: ~10–30 giây/chương.
 
-Truyenfree.org chia từng câu/đoạn văn thành hàng trăm `<span>` nhỏ, sắp xếp chúng **ngẫu nhiên trong DOM** nhưng dùng CSS (`position: absolute`, `order`, `transform`...) để hiển thị đúng thứ tự trên màn hình. Nếu đọc thẳng từ HTML, kết quả sẽ là chuỗi ký tự lộn xộn.
+### 2. `tangthuvien` — tangthuvien.org (Nhanh)
+- **Kỹ thuật**: Next.js SSR — nội dung render sẵn trong HTML ban đầu, không bị xáo trộn.
+- **Giải pháp**: `urllib` + `html.parser` tiêu chuẩn, không cần trình duyệt headless.
+- **Tốc độ**: ~0.5–1 giây/chương.
 
-Ngoài ra, website còn chèn các đoạn **text ẩn** (watermark/trap text) với `display: none` hoặc `opacity: 0` để đánh dấu nội dung bị sao chép.
+### 3. `vietnamthuquan` — vietnamthuquan.eu (POST API)
+- **Kỹ thuật**: Nội dung chương được tải động qua POST AJAX, yêu cầu session cookie ASP.NET.
+- **Giải pháp**: Thiết lập session bằng `CookieJar`, gửi POST request trực tiếp đến endpoint API để lấy nội dung chương.
+- **Tốc độ**: ~0.5–1 giây/chương.
 
-### Giải pháp
+### 4. `webnovel` — (nguồn nội bộ)
+- **Giải pháp**: Playwright headless với các chiến lược chờ đặc thù.
 
-Sử dụng **Playwright** (trình duyệt headless) để render trang web thật sự, sau đó:
+### 5. `ntruyen` — ntruyen.xyz (API + Playwright)
+- **Kỹ thuật**: Nội dung ở dạng Next.js SPA, cần lấy chapter map từ REST API.
+- **Giải pháp**: Fetch song song danh sách chương từ API (`/api/novels/{id}/chapters`), xây dựng chapter map, sau đó dùng Playwright để render từng chương.
+- **Tốc độ**: ~0.5–1 giây/chương (sau khi tải xong chapter map).
 
-1. Thu thập tất cả text node có trong `<article>` (container nội dung)
-2. Lọc bỏ các element **ẩn** (`display: none`, `visibility: hidden`, `opacity: 0`, kích thước = 0)
-3. Lọc bỏ text watermark đã biết
-4. Lấy **tọa độ hiển thị thực tế** (`getBoundingClientRect`) của từng text node
-5. Sắp xếp theo thứ tự `top → left` (trên xuống dưới, trái qua phải)
-6. Ghép lại thành đoạn văn liên mạch với logic:
-   - `vGap > 1.5 × lineHeight` → xuống đoạn mới (`\n`)
-   - `vGap > 0.5 × lineHeight` → text wrap dòng, thêm dấu cách
-   - `hGap > 4px` → khoảng cách từ cùng dòng, thêm dấu cách
-   - Còn lại → ký tự scrambled liền nhau, không thêm gì
+### 6. `truyenhoangdung` — truyenhoangdung.xyz (Nhanh, mới)
+- **Kỹ thuật**: Server-side rendering thuần túy — nội dung chương truyện có đầy đủ ngay trong HTML trả về, không cần JavaScript.
+- **Giải pháp**: `urllib` đơn giản + regex để trích xuất tiêu đề (từ `<option selected>`) và nội dung (từ `<div id="noidung">`). Không cần Playwright.
+- **Tốc độ**: ~0.3–0.8 giây/chương.
 
 ---
 
 ## Cấu trúc dự án
 
-```
+```text
 Truyenfree/
-├── venv/               # Môi trường ảo Python (không commit)
-├── scraper.py          # Script cào dữ liệu
-├── make_epub.py        # Script chuyển đổi text sang EPUB
-├── main.py             # Script chạy toàn bộ quy trình (Cào -> EPUB)
-├── truyen_output.txt   # File text tạm thời
-├── truyen_output.epub  # File EPUB kết quả
-├── README.md           # Tài liệu này
-└── Readme.txt          # Ghi chú lệnh nhanh
+├── scrapers/
+│   ├── __init__.py             # Quản lý danh sách nguồn hỗ trợ và factory khởi tạo
+│   ├── base.py                 # Lớp cơ sở trừu tượng BaseScraper
+│   ├── truyenfree.py           # truyenfree.org (Playwright + Proxy)
+│   ├── tangthuvien.py          # tangthuvien.org (urllib + html.parser)
+│   ├── vietnamthuquan.py       # vietnamthuquan.eu (urllib + POST session)
+│   ├── webnovel.py             # webnovel (Playwright)
+│   ├── ntruyen.py              # ntruyen.xyz (API + Playwright)
+│   └── truyenhoangdung.py      # truyenhoangdung.xyz (urllib + regex)
+├── main.py                     # File điều khiển quy trình chạy chính (cào -> EPUB)
+├── make_epub.py                # File sinh sách EPUB từ file text đầu ra
+├── Bia.webp                    # Ảnh bìa mặc định cho sách EPUB
+├── requirements.txt            # Các thư viện phụ thuộc
+├── README.md                   # Tài liệu này
+└── Readme.txt                  # Ghi chú các lệnh nhanh
 ```
 
 ---
 
-## Yêu cầu hệ thống
-
-- Python **3.8+**
-- Windows / Linux / macOS
-- Kết nối internet (qua proxy hoặc trực tiếp)
-
----
-
-## Cài đặt
+## Cấu hình & Cài đặt
 
 ### Bước 1: Tạo môi trường ảo
+Tùy thuộc vào hệ điều hành của bạn, hãy tạo môi trường ảo Python:
 
-```powershell
-cd "e:\Code\Code Python\Truyenfree"
+```bash
+# Trên Windows
 python -m venv venv
+
+# Trên macOS / Linux
+python3 -m venv venv_mac
 ```
 
 ### Bước 2: Kích hoạt môi trường ảo
 
-```powershell
+```bash
 # Windows (PowerShell)
 .\venv\Scripts\Activate.ps1
 
 # Windows (CMD)
 .\venv\Scripts\activate.bat
 
-# Linux / macOS
-source venv/bin/activate
+# macOS / Linux (zsh/bash)
+source venv_mac/bin/activate
 ```
 
 ### Bước 3: Cài đặt thư viện
-
-```powershell
-pip install playwright ebooklib
+```bash
+pip install -r requirements.txt
 ```
+*(Hoặc cài đặt thủ công các thư viện chính: `pip install playwright ebooklib tqdm lxml`)*
 
-### Bước 4: Cài đặt trình duyệt Chromium cho Playwright
-
-```powershell
+### Bước 4: Cài đặt trình duyệt cho Playwright (Chỉ khi cần cào truyenfree / webnovel / ntruyen)
+```bash
 playwright install chromium
 ```
 
----
-
-## Cấu hình proxy
-
-Mở file `scraper.py`, tìm và chỉnh sửa:
-
+### Bước 5: Cấu hình Proxy (Chỉ dành cho truyenfree.org)
+Mở file `scrapers/truyenfree.py`, tìm và chỉnh sửa cấu hình proxy mặc định:
 ```python
-proxy = {
+self.proxy = kwargs.get("proxy", {
     "server": "http://1.231.81.166:3128"
-}
+})
 ```
 
 ---
 
-## Sử dụng
+## Hướng dẫn sử dụng
 
-Để chạy toàn bộ quy trình từ lúc lấy dữ liệu đến khi xuất file EPUB:
+Chương trình chính sử dụng thư viện `argparse` để phân tích tham số dòng lệnh một cách chuyên nghiệp và linh hoạt.
 
-```powershell
-python main.py <chapter_bắt_đầu> <chapter_kết_thúc>
+### Cú pháp cơ bản
+```bash
+python main.py <chương_bắt_đầu> <chương_kết_thúc> [nguồn_cào]
 ```
+Trong đó `nguồn_cào` mặc định là `truyenfree` nếu không truyền.
+
+**Các nguồn hỗ trợ:** `truyenfree`, `tangthuvien`, `vietnamthuquan`, `webnovel`, `ntruyen`, `truyenhoangdung`
+
+### Tùy chọn (flags)
+| Flag | Rút gọn | Mô tả |
+|------|---------|-------|
+| `--book-id` | `-b` | ID/Slug của truyện trên website |
+| `--title` | `-t` | Tiêu đề sách EPUB |
+| `--author` | `-a` | Tác giả sách EPUB |
+| `--output` | `-o` | Tên tệp EPUB đầu ra (mặc định: `truyen_output.epub`) |
 
 ### Ví dụ
 
-```powershell
-# Lấy và tạo EPUB cho chapter 1 đến 10
-python main.py 1 10
+#### truyenhoangdung.xyz (không cần Playwright, nhanh nhất)
+```bash
+# Cào truyện mặc định (ai-bao-han-tu-tien-dich), chương 1 đến 500
+python main.py 1 500 truyenhoangdung
+
+# Cào truyện tùy chỉnh
+python main.py 1 100 truyenhoangdung \
+  --book-id "ai-bao-han-tu-tien-dich" \
+  --title "Ai Bảo Hắn Tu Tiên (Dịch)" \
+  --author "Tối Bạch Đích Ô Nha" \
+  --output AiBaoHanTuTien.epub
 ```
 
-### Chạy lẻ từng bước (nếu cần)
+#### tangthuvien.org
+```bash
+python main.py 1 3 tangthuvien
 
-1. **Chỉ cào dữ liệu:** `python scraper.py 1 10`
-2. **Chỉ tạo EPUB:** `python make_epub.py`
+python main.py 1 10 tangthuvien \
+  --book-id de-nhat-kiem-than \
+  --title "Đệ Nhất Kiếm Thần" \
+  --author "Thanh Phong" \
+  --output truyen_new.epub
+```
 
-### Kết quả
+#### ntruyen.xyz
+```bash
+python main.py 1 100 ntruyen \
+  --book-id ai-bao-han-tu-tien \
+  --title "Ai Bảo Hắn Tu Tiên!" \
+  --output output.epub
+```
 
-- File text tạm: `truyen_output.txt`
-- File EPUB hoàn thiện: `truyen_output.epub`
-
-**Quy tắc định dạng EPUB:**
-- Hỗ trợ hiển thị tiếng Việt UTF-8 (NFC) chuẩn.
-- Đã fix lỗi font và dấu bị lệch (sử dụng font hệ thống hỗ trợ tiếng Việt).
-- Mục lục tự động tạo theo danh sách chương.
-
-**Quy tắc định dạng:**
-- `<h1>` — Tên chapter
-- `<h2>` — Toàn bộ nội dung chapter (text liên mạch, xuống dòng theo đoạn văn)
+#### truyenfree.org (yêu cầu Proxy)
+```bash
+python main.py 1 10 truyenfree
+```
 
 ---
 
 ## Lưu ý
 
-- Mỗi chapter mất khoảng **10–30 giây** để tải (phụ thuộc tốc độ proxy)
-- Script tự động nghỉ **1 giây** giữa các chapter để tránh bị chặn
-- Nếu một chapter thất bại, script sẽ **bỏ qua và tiếp tục** chapter tiếp theo
-- Chạy lại script sẽ **xoá file cũ** và tạo mới từ đầu
+- **Thời gian tải ước tính theo nguồn:**
 
----
+  | Nguồn | Tốc độ ước tính | Cần Playwright |
+  |-------|----------------|----------------|
+  | `truyenhoangdung` | ~0.3–0.8 giây/chương | ❌ Không |
+  | `tangthuvien` | ~0.5–1 giây/chương | ❌ Không |
+  | `vietnamthuquan` | ~0.5–1 giây/chương | ❌ Không |
+  | `ntruyen` | ~0.5–1 giây/chương | ✅ Có |
+  | `webnovel` | ~2–5 giây/chương | ✅ Có |
+  | `truyenfree` | ~10–30 giây/chương | ✅ Có + Proxy |
 
-## URL truyện
+- Tự động bỏ qua chương lỗi và tiếp tục tải chương tiếp theo để tránh gián đoạn.
+- Chạy lại script sẽ **xóa dữ liệu cũ** của tệp `truyen_output.txt` và ghi lại từ đầu.
 
-```
-https://truyenfree.org/truyen/dich-quang-am-chi-ngoai
-```
-
-Pattern URL từng chapter:
-
-```
-https://truyenfree.org/truyen/dich-quang-am-chi-ngoai/chuong-{số}
-```
