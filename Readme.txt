@@ -1,20 +1,27 @@
 # === KÍCH HOẠT MÔI TRƯỜNG ===
 source venv_mac/bin/activate
 
-# === TRUYENHOANGDUNG.XYZ (nhanh nhất, không cần Playwright) ===
+# === TỰ ĐỘNG NHẬN BIẾT LINK TRUYỆN (KHÔNG CẦN CHỌN TRANG) ===
+python3 main.py https://www.tvtruyen.cc/he-thong-manh-nhat-dich.html 1 100
+python3 main.py 1 100 https://ntruyen.xyz/truyen/ai-bao-han-tu-tien
+python3 main.py 1 100 -b https://www.truyenhoangdung.xyz/ai-bao-han-tu-tien-dich/
+
+# === CÁC CÚ PHÁP CŨ (VẪN HỖ TRỢ) ===
+# === TRUYENHOANGDUNG.XYZ ===
 python3 main.py 1 100 truyenhoangdung
 python3 main.py 70 1000 truyenhoangdung -t "Ai Bảo Hắn Tu Tiên (Dịch)" -o AiBaoHanTuTien.epub
 
 # === NTRUYEN.XYZ ===
 python3 main.py 1 100 ntruyen
-python3 main.py 1 100 ntruyen -b ai-bao-han-tu-tien -t "Ai Bảo Hắn Tu Tiên!" -o output.epub
 
 # === TANGTHUVIEN.ORG ===
 python3 main.py 1 10 tangthuvien
-python3 main.py 1 10 tangthuvien -b de-nhat-kiem-than -t "Đệ Nhất Kiếm Thần" -a "Thanh Phong" -o truyen_new.epub
 
 # === TRUYENFREE.ORG (cần Proxy) ===
 python3 main.py 1 10 truyenfree
+
+# === TVTRUYEN.CC (cần Proxy) ===
+python3 main.py 1 10 tvtruyen
 
 # === GIT ===
 git add .

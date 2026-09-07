@@ -12,6 +12,7 @@ import sys
 import re
 import os
 import io
+import random
 
 # Fix Windows console encoding
 if sys.platform == "win32":
@@ -131,14 +132,44 @@ def make_epub(input_file, output_file, book_title, author):
     book.add_author(author)
 
     # Cover image
-    cover_file = "Bia.webp"
-    if os.path.exists(cover_file):
+    cover_file = None
+    kindle_cover_dir = "KindleCover"
+
+    if os.path.isdir(kindle_cover_dir):
+        valid_exts = {".png", ".jpg", ".jpeg", ".webp"}
+        kindle_images = [
+            os.path.join(kindle_cover_dir, f) for f in os.listdir(kindle_cover_dir)
+            if os.path.splitext(f)[1].lower() in valid_exts and not f.startswith(".")
+        ]
+        if kindle_images:
+            cover_file = random.choice(kindle_images)
+            print(f"Đã chọn ngẫu nhiên ảnh bìa từ '{kindle_cover_dir}': {os.path.basename(cover_file)}")
+
+    # Fallback nếu không có ảnh trong KindleCover
+    if not cover_file:
+        possible_covers = [
+            "Bia.png", "bia.png",
+            "Bia.webp", "bia.webp",
+            "Bia.jpg", "bia.jpg",
+            "Bia.jpeg", "bia.jpeg",
+            "cover.png", "Cover.png",
+            "cover.jpg", "Cover.jpg",
+            "cover.webp", "Cover.webp"
+        ]
+        for candidate in possible_covers:
+            if os.path.exists(candidate):
+                cover_file = candidate
+                break
+
+    if cover_file:
+        ext = os.path.splitext(cover_file)[1].lower()
+        cover_name = f"cover{ext}"
         with open(cover_file, "rb") as f:
             cover_data = f.read()
-        book.set_cover("cover.webp", cover_data)
-        print(f"Đã thêm ảnh bìa: {cover_file}")
+        book.set_cover(cover_name, cover_data)
+        print(f"Đã thêm ảnh bìa vào EPUB: {cover_file}")
     else:
-        print(f"Không tìm thấy ảnh bìa ({cover_file}), bỏ qua.")
+        print("Không tìm thấy ảnh bìa, bỏ qua.")
 
     # CSS
     style = epub.EpubItem(
